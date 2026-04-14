@@ -1,0 +1,135 @@
+import os
+import psycopg2
+from psycopg2.extras import execute_batch
+
+DB_NAME = "iit_dining_bot"
+DB_USER = "postgres"
+DB_PASSWORD = "postgress089"
+DB_HOST = "localhost"
+DB_PORT = "5432"
+
+
+def get_connection():
+    return psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+
+def init_db():
+    create_table_query = """
+    CREATE TABLE IF NOT EXISTS menu_items (
+        id SERIAL PRIMARY KEY,
+        date DATE NOT NULL,
+        meal_slug TEXT NOT NULL,
+        meal_name TEXT NOT NULL,
+        category_name TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        desc TEXT,
+        portion TEXT,
+        ingredients TEXT,
+        calories INTEGER,
+        allergens TEXT,
+        protein_g REAL,
+        fat REAL
+    );
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(create_table_query)
+        conn.commit()
+
+
+def delete_rows_for_date(date_str: str):
+    delete_query = """
+    DELETE FROM menu_items
+    WHERE date = %s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(delete_query, (date_str,))
+        conn.commit()
+
+
+def save_menu_items(normalized_items):
+    if not normalized_items:
+        return
+
+    date_str = normalized_items[0]["date"]
+
+    delete_rows_for_date(date_str)
+
+    insert_query = """
+    INSERT INTO menu_items (
+        date,
+        meal_slug,
+        meal_name,
+        category_name,
+        item_id,
+        item_name,
+        desc,
+        portion,
+        ingredients,
+        calories,
+        allergens,
+        protein_g,
+        fat
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+    """
+
+    rows = []
+    for item in normalized_items:
+        allergens = item.get("Allergens", [])
+
+        if isinstance(allergens, list):
+            allergens_str = ", ".join(str(a) for a in allergens)
+        else:
+            allergens_str = str(allergens) if allergens is not None else ""
+
+        calories = item.get("calories")
+        try:
+            calories = int(calories) if calories is not None else None
+        except (TypeError, ValueError):
+            calories = None
+
+        protein_g = item.get("Protein_g")
+        try:
+            protein_g = float(protein_g) if protein_g is not None else None
+        except (TypeError, ValueError):
+            protein_g = None
+
+        fat = item.get("fat")
+        try:
+            fat = float(fat) if fat is not None else None
+        except (TypeError, ValueError):
+            fat = None
+
+        rows.append(
+            (
+                item.get("date"),
+                item.get("meal_slug"),
+                item.get("meal_name"),
+                item.get("category_name"),
+                item.get("item_id"),
+                item.get("item_name"),
+                item.get("desc"),
+                item.get("portion"),
+                item.get("ingredients"),
+                calories,
+                allergens_str,
+                protein_g,
+                fat,
+            )
+        )
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            execute_batch(cur, insert_query, rows)
+        conn.commit()
