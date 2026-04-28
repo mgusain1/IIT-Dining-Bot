@@ -1,8 +1,8 @@
-from datetime import datetime
+from fetch_menu import get_today_date
 from chatbot import answer_question
 
 def run_chatbot():
-    today_date = datetime.now().strftime("%Y-%m-%d")
+    today_date = get_today_date()
     print("Welcome to IIT Dining Bot")
     print("Ask about breakfast, lunch, dinner, or protein items")
     print("Type 'q' to exit\n")

@@ -9,6 +9,18 @@ def get_connection():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
+def has_data_for_date(date_str:str):
+    query = """
+    SELECT 1 
+    FROM menu_items
+    WHERE date = ?
+    LIMIT 1 """
+    with get_connection as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, (date_str,))
+        row = cursor.fetchone()
+    return row is not None
+
 
 def init_db():
     create_table_query = """
